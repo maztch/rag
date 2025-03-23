@@ -8,4 +8,7 @@ conda install ollama langchain sentence-transformers chromadb pypdf pdfplumber t
 
 pip install -U "huggingface_hub[cli]"
 
-huggingface-cli download deepseek-ai/deepseek-llm-7b
+
+huggingface-cli download deepseek-ai/DeepSeek-R1
+huggingface-cli download deepseek-ai/deepseek-llm-7b-base
+huggingface-cli download deepseek-ai/deepseek-llm-7b-chat
