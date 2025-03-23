@@ -5,7 +5,6 @@ import pypdf
 import hashlib
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import chromadb
-import tiktoken
 
 
 def extract_text_from_pdf(pdf_path):
@@ -32,55 +31,43 @@ def file_already_exists(collection, file_md5):
     )
     return bool(results["metadatas"])  # If there's at least one match, return True
 
-def tokenize_text(text, model="gpt-3.5-turbo"):
-    """Tokenizes text using OpenAI's encoding for better chunking."""
-    encoder = tiktoken.encoding_for_model(model)
-    tokens = encoder.encode(text)
-    return tokens
-
-def split_text_into_chunks(text, chunk_size=200, chunk_overlap=50):
-    """Splits text into chunks based on tokens, not characters."""
-    tokens = tokenize_text(text)
-    chunks = []
-    
-    for i in range(0, len(tokens), chunk_size - chunk_overlap):
-        chunk = tokens[i:i + chunk_size]
-        chunks.append(chunk)
-    
-    return chunks
-
 def process_file(file_path, collection_name, chroma_client):
-    """Processes a single file, tokenizes content into chunks, and inserts into ChromaDB."""
-    file_id = str(uuid.uuid4())
-    file_name = os.path.basename(file_path)
-    file_md5 = get_file_md5(file_path)
-    content = extract_text_from_pdf(file_path)
-
-    print(f"Processing: {file_name} (MD5: {file_md5})")
-
-    collection = chroma_client.get_or_create_collection(name=collection_name)
-
-    if file_already_exists(collection, file_md5):
-        print("File already exists in the collection. Skipping...")
+    if not file_path.lower().endswith(".pdf"):
+        print(f"Skipping non-PDF file: {file_path}")
         return
 
-    # 🔹 Nou mètode de divisió usant tokens
-    chunks = split_text_into_chunks(content, chunk_size=200, chunk_overlap=50)
+    """Processes a single file, splits content into chunks, and inserts into ChromaDB."""
+    file_id = str(uuid.uuid4())
+    file_name = os.path.basename(file_path)
+    content = extract_text_from_pdf(file_path)
+    file_md5 = get_file_md5(file_path)
+    print(f"File Name: {file_name}")
+    print(f"File MD5: {file_md5}")
     
+    collection = chroma_client.get_or_create_collection(name=collection_name)
+
+    # check we don't have any file with the same md5
+    query = collection.query(
+        query_texts=[file_md5],
+        n_results=1
+    )
+    if query["documents"]:
+        print("File already exists in the collection.")
+        return
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, chunk_overlap=100
+    )
+    chunks = text_splitter.split_text(content)
+        
     for index, chunk in enumerate(chunks):
         chunk_id = f"{file_id}-{index}"
         collection.add(
-            documents=[" ".join(map(str, chunk))],  # Convertim tokens a text
-            metadatas=[{
-                "file_id": file_id,
-                "chunk_id": chunk_id,
-                "file_name": file_name,
-                "file_md5": file_md5
-            }],
+            documents=[chunk],
+            metadatas=[{"file_id": file_id, "chunk_id": chunk_id, "file_name": file_name, "file_md5": file_md5}],
             ids=[chunk_id]
         )
-
-    print(f"Inserted {len(chunks)} tokenized chunks into collection {collection_name}")
+    print(f"Inserted {index} chunks into collection {collection_name}")
 
 def process_input(input_path, collection_name, chroma_client):
     """Handles input, deciding if it's a file or directory."""
