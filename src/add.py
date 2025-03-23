@@ -8,9 +8,8 @@ import chromadb
 import tiktoken
 from transformers import AutoTokenizer
 
-
 # Carregar el tokenizer oficial de DeepSeek-R1
-deepseek_tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/deepseek-llm-7b")
+deepseek_tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/DeepSeek-R1")
 
 
 def extract_text_from_pdf(pdf_path):
