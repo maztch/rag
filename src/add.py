@@ -44,16 +44,19 @@ def process_file(file_path, collection_name, chroma_client):
     print(f"File Name: {file_name}")
     print(f"File MD5: {file_md5}")
     
+    # Ensure the collection is created correctly
     collection = chroma_client.get_or_create_collection(name=collection_name)
 
-    # check we don't have any file with the same md5
-    query = collection.query(
-        query_texts=[file_md5],
-        n_results=1
-    )
-    if query["documents"]:
-        print("File already exists in the collection.")
-        return
+    # Check the collection count to ensure it's empty
+    if collection.count() == 0:
+        print("Collection is empty.")
+    else:
+        # find if the file already exists in the collection
+        if file_already_exists(collection, file_md5):
+            print("File already exists in the collection.")
+            return
+
+    print("File not found, adding it.")
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000, chunk_overlap=100

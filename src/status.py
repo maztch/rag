@@ -33,6 +33,14 @@ def run(database, collection):
                     sample_item = current_collection.peek(limit=1)  # Peek at the first item
                     metadata_keys = sample_item.get("metadatas", [{}])[0].keys()
                     print(f"  Metadata Schema: {list(metadata_keys)}")
+
+                    # Retrieve all metadata from the collection
+                    all_docs = current_collection.get(include=["metadatas"])
+                    # Extract file names from metadata
+                    file_names = {metadata["file_name"] for metadata in all_docs["metadatas"] if "file_name" in metadata}
+                    # Print or use the distinct file names
+                    print(file_names)
+                    
                 except Exception as e:
                     print(f"  Error inspecting metadata: {e}")
             else:
