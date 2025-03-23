@@ -6,10 +6,6 @@ import hashlib
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import chromadb
 import tiktoken
-from transformers import AutoTokenizer
-
-# Carregar el tokenizer oficial de DeepSeek-R1
-deepseek_tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/DeepSeek-R1")
 
 
 def extract_text_from_pdf(pdf_path):
@@ -36,20 +32,15 @@ def file_already_exists(collection, file_md5):
     )
     return bool(results["metadatas"])  # If there's at least one match, return True
 
-def tokenize_text_openai(text, model="gpt-3.5-turbo"):
+def tokenize_text(text, model="gpt-3.5-turbo"):
     """Tokenizes text using OpenAI's encoding for better chunking."""
     encoder = tiktoken.encoding_for_model(model)
     tokens = encoder.encode(text)
     return tokens
 
-def tokenize_text_deepseek(text):
-    """Tokenitza text utilitzant el tokenizer de DeepSeek-R1."""
-    tokens = deepseek_tokenizer.encode(text, add_special_tokens=False)
-    return tokens
-
 def split_text_into_chunks(text, chunk_size=200, chunk_overlap=50):
     """Splits text into chunks based on tokens, not characters."""
-    tokens = tokenize_text_deepseek(text)
+    tokens = tokenize_text(text)
     chunks = []
     
     for i in range(0, len(tokens), chunk_size - chunk_overlap):
@@ -59,7 +50,7 @@ def split_text_into_chunks(text, chunk_size=200, chunk_overlap=50):
     return chunks
 
 def process_file(file_path, collection_name, chroma_client):
-    """Processa un fitxer, tokenitza el contingut amb DeepSeek-R1 i l'afegeix a ChromaDB."""
+    """Processes a single file, tokenizes content into chunks, and inserts into ChromaDB."""
     file_id = str(uuid.uuid4())
     file_name = os.path.basename(file_path)
     file_md5 = get_file_md5(file_path)
@@ -73,14 +64,13 @@ def process_file(file_path, collection_name, chroma_client):
         print("File already exists in the collection. Skipping...")
         return
 
-    # 🔹 Utilitzar DeepSeek-R1 per dividir el text en chunks
+    # 🔹 Nou mètode de divisió usant tokens
     chunks = split_text_into_chunks(content, chunk_size=200, chunk_overlap=50)
     
     for index, chunk in enumerate(chunks):
         chunk_id = f"{file_id}-{index}"
-        chunk_text = deepseek_tokenizer.decode(chunk)  # Convertir tokens a text
         collection.add(
-            documents=[chunk_text],  
+            documents=[" ".join(map(str, chunk))],  # Convertim tokens a text
             metadatas=[{
                 "file_id": file_id,
                 "chunk_id": chunk_id,
@@ -90,7 +80,7 @@ def process_file(file_path, collection_name, chroma_client):
             ids=[chunk_id]
         )
 
-    print(f"Inserted {len(chunks)} DeepSeek-tokenized chunks into collection {collection_name}")
+    print(f"Inserted {len(chunks)} tokenized chunks into collection {collection_name}")
 
 def process_input(input_path, collection_name, chroma_client):
     """Handles input, deciding if it's a file or directory."""
